@@ -15,7 +15,7 @@ La consigna indica grupos de tres (máximo cuatro). Confirmar autorización si e
 - Cliente C2: **8000**, cédula **40200008000**.
 - Viaje de prueba predeterminado: **16400**. **No es una asignación confirmada del docente.** Cambiar `scripts/00_configuracion.sql` o pasar el viaje al validador.
 - Revisión basada en commit `8ffb466bf43e133bf75a0b27df3403a70838c214`.
-- **No certificado mediante ejecución en SQL Server**: el motor 2022 descargado falló al iniciar en el entorno aislado de revisión. Ver `REVISION.md`.
+- Validación ejecutada satisfactoriamente en SQL Server 2022 mediante GitHub Actions. Se usó el viaje 16400, elegido provisionalmente por el grupo. Ver `REVISION.md`.
 - No se han generado métricas, planes, capturas ni restauraciones ficticias.
 
 ## Validación completa desde terminal
