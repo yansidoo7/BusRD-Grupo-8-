@@ -141,6 +141,7 @@ try:
     require(scalar('SELECT COUNT(*) FROM dbo.Pagos p LEFT JOIN dbo.Boletos b ON p.BoletoID=b.BoletoID WHERE b.BoletoID IS NULL')==0,'Persisten pagos huérfanos')
     require(scalar("SELECT COUNT(*) FROM sys.foreign_keys WHERE is_disabled=1 OR is_not_trusted=1")==0,'FK deshabilitada o no confiable')
     record('integridad','Sin duplicados ni huérfanos; FKs habilitadas y confiables')
+        script(Path('validacion/assert_todos_los_viajes.sql'))
     concurrency(True)
     script(Path('validacion/assert_transacciones.sql'))
     # Anular dos veces no debe duplicar el reverso; el asiento debe poder revenderse.
