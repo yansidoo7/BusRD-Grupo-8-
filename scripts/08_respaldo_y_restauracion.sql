@@ -173,7 +173,7 @@ GO
 /* ---------- PASO 10: verificación ---------- */
 SELECT name, state_desc FROM sys.databases WHERE name IN ('BusRD','BusRD_Recuperada');
 
-DECLARE @ViajeGrupo INT = (SELECT ViajeID FROM dbo.ConfiguracionGrupo WHERE GrupoID=8);   -- misma configuración del grupo
+DECLARE @ViajeGrupo INT = (SELECT ViajeID FROM BusRD.dbo.ConfiguracionGrupo WHERE GrupoID=8);   -- misma configuración del grupo
 
 -- 10.1 En BusRD (producción) los boletos del viaje siguen borrados; en la recuperada no
 SELECT 'BusRD (con el DELETE)' AS Base, COUNT(*) AS Boletos FROM BusRD.dbo.Boletos WHERE ViajeID = @ViajeGrupo
