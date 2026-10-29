@@ -55,9 +55,3 @@ python validacion/validar.py --recrear-base-pruebas --viaje 16400
 6. `06_indices_y_consultas_optimizadas.sql`, `07_seguridad.sql` y `08_respaldo_y_restauracion.sql`.
 
 Las demos son interactivas: no ejecutar todos los bloques de A antes de abrir B. El validador automatiza sus pruebas equivalentes con dos conexiones y el mismo asiento fijado previamente.
-
-## Entrega académica pendiente
-
-Se requieren informe PDF (máximo diez páginas sin portada/anexos), capturas numeradas y la exposición de 15–20 minutos. Los registros de terminal y planes XML son evidencia técnica complementaria; confirmar con el docente cómo presentarlos en lugar de las capturas de SSMS que especifica la consigna.
-
-El administrador tiene CONTROL completo de la base. La exigencia de dos accesos denegados *por rol* es ambigua para ese rol; documentar su alcance o aclararla con el docente. No se agregan restricciones contradictorias ni se inventan denegaciones.
