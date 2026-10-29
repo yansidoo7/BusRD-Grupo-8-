@@ -1,0 +1,28 @@
+name: Validar BusRD
+
+on:
+  push:
+    branches:
+      - fix/validacion-grupo8
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validar:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ejecutar pruebas en SQL Server 2022
+        run: bash validacion/docker-terminal.sh 16400
+
+      - name: Guardar resultados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultados-sqlserver
+          path: evidencias/
+          if-no-files-found: warn
