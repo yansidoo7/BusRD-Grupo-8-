@@ -8,7 +8,8 @@
    ========================================================= */
 USE master;
 GO
-EXEC master.sys.xp_create_subdir N'C:\Backups\BusRD\';
+-- Se utiliza el directorio de datos existente del motor (Windows o Linux).
+-- No necesita xp_create_subdir ni permisos para ejecutar procedimientos extendidos.
 GO
 USE BusRD;
 GO
@@ -24,13 +25,14 @@ SELECT name, recovery_model_desc FROM sys.databases WHERE name = 'BusRD';
 GO
 
 /* ---------- PASO 2: backup FULL (inicia la cadena de log) ---------- */
+DECLARE @Archivo NVARCHAR(4000)=CONVERT(NVARCHAR(4000),SERVERPROPERTY('InstanceDefaultDataPath'))+N'BusRD_full.bak';
 BACKUP DATABASE BusRD
-TO DISK = N'C:\Backups\BusRD\BusRD_full.bak'
+TO DISK = @Archivo
 WITH INIT, CHECKSUM, STATS = 10, NAME = N'BusRD Full';
 GO
 
 /* ---------- PASO 3: vender 5 boletos ---------- */
-DECLARE @ViajeGrupo INT = 16400;   -- <<< CAMBIAR: viaje asignado al grupo
+DECLARE @ViajeGrupo INT = (SELECT ViajeID FROM dbo.ConfiguracionGrupo WHERE GrupoID=8);   -- viaje configurado en 00_configuracion.sql
 IF NOT EXISTS (SELECT 1 FROM dbo.Viajes WHERE ViajeID = @ViajeGrupo AND Estado = 'Programado')
     THROW 51000, 'El viaje del grupo no existe o no está Programado.', 1;
 
@@ -54,14 +56,15 @@ SELECT * FROM tempdb.dbo.BusRD_VentasPrueba;
 GO
 
 /* ---------- PASO 4: backup DIFERENCIAL ---------- */
+DECLARE @Archivo NVARCHAR(4000)=CONVERT(NVARCHAR(4000),SERVERPROPERTY('InstanceDefaultDataPath'))+N'BusRD_diff.bak';
 BACKUP DATABASE BusRD
-TO DISK = N'C:\Backups\BusRD\BusRD_diff.bak'
+TO DISK = @Archivo
 WITH DIFFERENTIAL, INIT, CHECKSUM, STATS = 10, NAME = N'BusRD Diferencial';
 GO
 
 /* ---------- PASO 5: vender 3 boletos más ---------- */
-DECLARE @ViajeGrupo INT = 16400;   -- <<< CAMBIAR (mismo valor)
-DECLARE @i INT = 1, @a INT, @id INT;
+DECLARE @ViajeGrupo INT = (SELECT ViajeID FROM dbo.ConfiguracionGrupo WHERE GrupoID=8);   -- misma configuración del grupo
+DECLARE @i INT = 1, @a INT, @id INT, @ClienteID INT;
 WHILE @i <= 3
 BEGIN
     SELECT @a = MAX(s.NumeroAsiento)
@@ -70,7 +73,8 @@ BEGIN
       AND NOT EXISTS (SELECT 1 FROM dbo.Boletos b
                       WHERE b.ViajeID = @ViajeGrupo AND b.NumeroAsiento = s.NumeroAsiento
                         AND b.Estado = 'Activo');
-    EXEC dbo.sp_VenderBoleto @ViajeGrupo, @a, 10 + @i, 'Web', 'Tarjeta', @id OUTPUT;
+    SET @ClienteID = 10 + @i;
+    EXEC dbo.sp_VenderBoleto @ViajeGrupo, @a, @ClienteID, 'Web', 'Tarjeta', @id OUTPUT;
     INSERT tempdb.dbo.BusRD_VentasPrueba VALUES ('Despues del DIFF', @id, @ViajeGrupo, @a);
     SET @i += 1;
 END
@@ -78,8 +82,9 @@ SELECT * FROM tempdb.dbo.BusRD_VentasPrueba;
 GO
 
 /* ---------- PASO 6: backup de LOG y hora exacta ---------- */
+DECLARE @Archivo NVARCHAR(4000)=CONVERT(NVARCHAR(4000),SERVERPROPERTY('InstanceDefaultDataPath'))+N'BusRD_log1.trn';
 BACKUP LOG BusRD
-TO DISK = N'C:\Backups\BusRD\BusRD_log1.trn'
+TO DISK = @Archivo
 WITH INIT, CHECKSUM, STATS = 10, NAME = N'BusRD Log 1';
 GO
 
@@ -92,14 +97,14 @@ SELECT Hora AS HoraAnotada_AntesDelDelete FROM tempdb.dbo.BusRD_StopAt;
 -- Copia de referencia de los boletos del viaje, para comparar luego (vive fuera de BusRD)
 IF OBJECT_ID('tempdb.dbo.BusRD_SnapshotBoletos') IS NOT NULL DROP TABLE tempdb.dbo.BusRD_SnapshotBoletos;
 SELECT * INTO tempdb.dbo.BusRD_SnapshotBoletos
-FROM dbo.Boletos WHERE ViajeID = 16400;   -- <<< CAMBIAR (mismo valor)
+FROM dbo.Boletos WHERE ViajeID = (SELECT ViajeID FROM dbo.ConfiguracionGrupo WHERE GrupoID=8);   -- misma configuración del grupo
 SELECT COUNT(*) AS BoletosDelViaje_AntesDelDelete FROM tempdb.dbo.BusRD_SnapshotBoletos;
 
 WAITFOR DELAY '00:00:03';   -- separa la hora anotada del DELETE
 GO
 
 /* ---------- PASO 7: el "error humano" ---------- */
-DECLARE @ViajeGrupo INT = 16400;   -- <<< CAMBIAR (mismo valor)
+DECLARE @ViajeGrupo INT = (SELECT ViajeID FROM dbo.ConfiguracionGrupo WHERE GrupoID=8);   -- misma configuración del grupo
 
 -- 7.1 Un DELETE directo falla gracias a la FK Pagos -> Boletos (la integridad ya protege)
 BEGIN TRY
@@ -120,8 +125,9 @@ GO
 
 /* ---------- PASO 8: backup del LOG DE COLA ----------
    Captura lo ocurrido desde el último backup de log, incluido el DELETE. */
+DECLARE @Archivo NVARCHAR(4000)=CONVERT(NVARCHAR(4000),SERVERPROPERTY('InstanceDefaultDataPath'))+N'BusRD_log_cola.trn';
 BACKUP LOG BusRD
-TO DISK = N'C:\Backups\BusRD\BusRD_log_cola.trn'
+TO DISK = @Archivo
 WITH NO_TRUNCATE, INIT, CHECKSUM, STATS = 10, NAME = N'BusRD Log de cola';
 GO
 
@@ -140,23 +146,26 @@ DECLARE @hora DATETIME = (SELECT Hora FROM tempdb.dbo.BusRD_StopAt);
 
 SELECT @lDatos = name FROM sys.master_files WHERE database_id = DB_ID('BusRD') AND type = 0;
 SELECT @lLog   = name FROM sys.master_files WHERE database_id = DB_ID('BusRD') AND type = 1;
-SELECT @dir = LEFT(physical_name, LEN(physical_name) - CHARINDEX('\', REVERSE(physical_name)) + 1)
-FROM sys.master_files WHERE database_id = DB_ID('BusRD') AND type = 0;
+SET @dir = CONVERT(NVARCHAR(260),SERVERPROPERTY('InstanceDefaultDataPath'));
+DECLARE @full NVARCHAR(4000)=@dir+N'BusRD_full.bak',
+        @tail NVARCHAR(4000)=@dir+N'BusRD_log_cola.trn';
 
 -- FULL
-SET @sql = N'RESTORE DATABASE BusRD_Recuperada FROM DISK = N''C:\Backups\BusRD\BusRD_full.bak'' '
+SET @sql = N'RESTORE DATABASE BusRD_Recuperada FROM DISK = N''' + REPLACE(@full,'''','''''') + N''' '
          + N'WITH MOVE N''' + @lDatos + N''' TO N''' + @dir + N'BusRD_Recuperada.mdf'', '
          + N'MOVE N''' + @lLog + N''' TO N''' + @dir + N'BusRD_Recuperada_log.ldf'', NORECOVERY, STATS = 10;';
 EXEC (@sql);
 
 -- DIFERENCIAL
-RESTORE DATABASE BusRD_Recuperada FROM DISK = N'C:\Backups\BusRD\BusRD_diff.bak' WITH NORECOVERY;
+DECLARE @ArchivoDiff NVARCHAR(4000)=@dir+N'BusRD_diff.bak';
+RESTORE DATABASE BusRD_Recuperada FROM DISK = @ArchivoDiff WITH NORECOVERY;
 
 -- LOG 1 (incluye las 3 ventas posteriores al diferencial)
-RESTORE LOG BusRD_Recuperada FROM DISK = N'C:\Backups\BusRD\BusRD_log1.trn' WITH NORECOVERY;
+DECLARE @ArchivoLog NVARCHAR(4000)=@dir+N'BusRD_log1.trn';
+RESTORE LOG BusRD_Recuperada FROM DISK = @ArchivoLog WITH NORECOVERY;
 
 -- LOG DE COLA, detenido justo antes del DELETE
-SET @sql = N'RESTORE LOG BusRD_Recuperada FROM DISK = N''C:\Backups\BusRD\BusRD_log_cola.trn'' '
+SET @sql = N'RESTORE LOG BusRD_Recuperada FROM DISK = N''' + REPLACE(@tail,'''','''''') + N''' '
          + N'WITH STOPAT = ''' + CONVERT(VARCHAR(23), @hora, 121) + N''', RECOVERY;';
 EXEC (@sql);
 GO
@@ -164,7 +173,7 @@ GO
 /* ---------- PASO 10: verificación ---------- */
 SELECT name, state_desc FROM sys.databases WHERE name IN ('BusRD','BusRD_Recuperada');
 
-DECLARE @ViajeGrupo INT = 16400;   -- <<< CAMBIAR (mismo valor)
+DECLARE @ViajeGrupo INT = (SELECT ViajeID FROM BusRD.dbo.ConfiguracionGrupo WHERE GrupoID=8);   -- misma configuración del grupo
 
 -- 10.1 En BusRD (producción) los boletos del viaje siguen borrados; en la recuperada no
 SELECT 'BusRD (con el DELETE)' AS Base, COUNT(*) AS Boletos FROM BusRD.dbo.Boletos WHERE ViajeID = @ViajeGrupo

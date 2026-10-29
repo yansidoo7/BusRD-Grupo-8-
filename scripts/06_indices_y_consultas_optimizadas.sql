@@ -6,8 +6,8 @@
 
    NOTA SOBRE LA LÍNEA BASE: el índice único filtrado de E1
    (UX_Boletos_AsientoActivo) también acelera C1. Para medir un
-   "antes" honesto, la sección A lo DESHABILITA y luego lo
-   reconstruye. La línea base más pura se obtiene corriendo
+   "antes" honesto, el validador captura la base antes de E1.
+   Este script mantiene la restricción siempre activa. La línea base más pura se obtiene corriendo
    03_consultas_lentas.sql (con tus parámetros) justo después de
    crear la base, ANTES de 01_integridad.sql.
    ========================================================= */
@@ -20,14 +20,14 @@ GO
 DROP INDEX IF EXISTS IX_Boletos_Cliente       ON dbo.Boletos;
 DROP INDEX IF EXISTS IX_Boletos_Estado_Fecha  ON dbo.Boletos;
 DROP INDEX IF EXISTS IX_Pagos_Boleto          ON dbo.Pagos;
-ALTER INDEX UX_Boletos_AsientoActivo ON dbo.Boletos DISABLE;
+-- Unicidad siempre activa. La línea base sin índices se captura ANTES de E1.
 GO
 SET STATISTICS IO ON;
 SET STATISTICS TIME ON;
 GO
 
 /* C1 original - viaje asignado al grupo */
-DECLARE @ViajeID INT = 16000;      -- <<< CAMBIAR: viaje asignado al grupo
+DECLARE @ViajeID INT = (SELECT ViajeID FROM dbo.ConfiguracionGrupo WHERE GrupoID=8);      -- viaje configurado en 00_configuracion.sql
 SELECT s.NumeroAsiento, s.Ubicacion
 FROM dbo.Viajes v
 JOIN dbo.Asientos s ON s.AutobusID = v.AutobusID
@@ -68,7 +68,7 @@ GO
 SET STATISTICS IO OFF;
 SET STATISTICS TIME OFF;
 GO
-ALTER INDEX UX_Boletos_AsientoActivo ON dbo.Boletos REBUILD;   -- se vuelve a activar la unicidad
+-- La unicidad permanece activa durante todo este script.
 GO
 
 /* =========================================================
@@ -112,7 +112,7 @@ SET STATISTICS TIME ON;
 GO
 
 /* C1 optimizada */
-DECLARE @ViajeID INT = 16000;      -- <<< CAMBIAR (mismo valor)
+DECLARE @ViajeID INT = (SELECT ViajeID FROM dbo.ConfiguracionGrupo WHERE GrupoID=8);      -- misma configuración del grupo
 SELECT s.NumeroAsiento, s.Ubicacion
 FROM dbo.Viajes v
 JOIN dbo.Asientos s ON s.AutobusID = v.AutobusID
@@ -126,7 +126,7 @@ ORDER BY s.NumeroAsiento;
 GO
 
 /* C2 optimizada */
-DECLARE @Grupo INT = 8;            -- <<< CAMBIAR (mismo valor)
+DECLARE @Grupo INT = 8;            -- misma configuración del grupo
 DECLARE @Cedula CHAR(11) = '402' + RIGHT('00000000' + CAST(@Grupo * 1000 AS VARCHAR(8)), 8);
 SELECT c.Nombre, c.Apellido, r.Origen, r.Destino,
        v.FechaSalida, b.NumeroAsiento, b.Precio, b.Estado
@@ -161,8 +161,8 @@ GO
    Cada bloque debe devolver 0 en las dos columnas "Solo en..." y
    el mismo número de filas.
    ========================================================= */
-DECLARE @ViajeID INT = 16000;      -- <<< CAMBIAR (mismo valor)
-DECLARE @Grupo INT = 8;            -- <<< CAMBIAR (mismo valor)
+DECLARE @ViajeID INT = (SELECT ViajeID FROM dbo.ConfiguracionGrupo WHERE GrupoID=8);      -- misma configuración del grupo
+DECLARE @Grupo INT = 8;            -- misma configuración del grupo
 DECLARE @Cedula CHAR(11) = '402' + RIGHT('00000000' + CAST(@Grupo * 1000 AS VARCHAR(8)), 8);
 
 IF OBJECT_ID('tempdb..#c1a') IS NOT NULL DROP TABLE #c1a;

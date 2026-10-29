@@ -1,53 +1,25 @@
-/* =========================================================
-   05_demo_concurrencia_sesionB.sql  -  E2 (partes 1 y 4)
-   SESIÓN B. Ejecutar cada parte DENTRO de los 10 s posteriores
-   a la misma parte en la sesión A (04_demo_concurrencia_sesionA.sql).
-   Usar el mismo @ViajeGrupo que en la sesión A.
-   ========================================================= */
+/* Ejecutar cada bloque durante la demora de A. Usar una segunda conexión. */
 USE BusRD;
 GO
-
-/* ---------- PARTE 1: venta con el procedimiento DEFECTUOSO (v0) ---------- */
-DECLARE @ViajeGrupo INT = 16400;   -- <<< CAMBIAR (mismo valor que en A)
-DECLARE @Asiento INT =
-    (SELECT MAX(s.NumeroAsiento)
-     FROM dbo.Viajes v
-     JOIN dbo.Asientos s ON s.AutobusID = v.AutobusID
-     WHERE v.ViajeID = @ViajeGrupo
-       AND NOT EXISTS (SELECT 1 FROM dbo.Boletos b
-                       WHERE b.ViajeID = @ViajeGrupo
-                         AND b.NumeroAsiento = s.NumeroAsiento
-                         AND b.Estado = 'Activo'));
-PRINT 'Sesión B - viaje ' + CAST(@ViajeGrupo AS VARCHAR(10)) + ', asiento ' + CAST(@Asiento AS VARCHAR(10))
-      + ' - inicio ' + CONVERT(VARCHAR(12), SYSDATETIME(), 114);
-
-EXEC dbo.sp_VenderBoleto_v0 @ViajeID = @ViajeGrupo, @NumeroAsiento = @Asiento,
-                            @ClienteID = 2, @Canal = 'Web', @Metodo = 'Tarjeta';
-
-PRINT 'Sesión B - fin ' + CONVERT(VARCHAR(12), SYSDATETIME(), 114);
+-- BLOQUE 1: V0, antes de integridad.
+DECLARE @v INT,@a INT;
+SELECT @v=ViajeID,@a=Asiento FROM tempdb.dbo.BusRD_DemoAsiento WHERE Etapa='v0';
+IF @a IS NULL THROW 51103, 'Primero prepare y ejecute la sesión A.',1;
+SELECT 'B v0' Sesion,@v ViajeID,@a Asiento,SYSDATETIME() Inicio;
+EXEC dbo.sp_VenderBoleto_v0 @v,@a,2,'Web','Tarjeta';
+SELECT SYSDATETIME() Fin;
 GO
-
-/* ---------- PARTE 3: venta con el procedimiento NUEVO ---------- */
-DECLARE @ViajeGrupo INT = 16400;   -- <<< CAMBIAR (mismo valor que en A)
-DECLARE @Asiento INT =
-    (SELECT MAX(s.NumeroAsiento)
-     FROM dbo.Viajes v
-     JOIN dbo.Asientos s ON s.AutobusID = v.AutobusID
-     WHERE v.ViajeID = @ViajeGrupo
-       AND NOT EXISTS (SELECT 1 FROM dbo.Boletos b
-                       WHERE b.ViajeID = @ViajeGrupo
-                         AND b.NumeroAsiento = s.NumeroAsiento
-                         AND b.Estado = 'Activo'));
-DECLARE @NuevoID INT;
-PRINT 'Sesión B - asiento ' + CAST(@Asiento AS VARCHAR(10)) + ' - inicio ' + CONVERT(VARCHAR(12), SYSDATETIME(), 114);
+-- BLOQUE 2: segura, después de integridad y procedimientos nuevos.
+DECLARE @v INT,@a INT,@id INT;
+SELECT @v=ViajeID,@a=Asiento FROM tempdb.dbo.BusRD_DemoAsiento WHERE Etapa='segura';
+IF @a IS NULL THROW 51103, 'Primero prepare y ejecute la sesión A.',1;
+SELECT 'B segura' Sesion,@v ViajeID,@a Asiento,SYSDATETIME() Inicio;
 BEGIN TRY
-    EXEC dbo.sp_VenderBoleto @ViajeID = @ViajeGrupo, @NumeroAsiento = @Asiento,
-                             @ClienteID = 2, @Canal = 'Web', @Metodo = 'Tarjeta',
-                             @BoletoID = @NuevoID OUTPUT, @SimularDemora = 1;
-    PRINT 'Sesión B - VENDIDO. BoletoID = ' + CAST(@NuevoID AS VARCHAR(10));
+ EXEC dbo.sp_VenderBoleto @v,@a,2,'Web','Tarjeta',@id OUTPUT,1;
+ THROW 51104,'PRUEBA FALLIDA: la segunda venta fue aceptada.',1;
 END TRY
 BEGIN CATCH
-    PRINT 'Sesión B - RECHAZADO: ' + ERROR_MESSAGE();
+ IF ERROR_NUMBER()<>50007 THROW;
+ SELECT ERROR_NUMBER() ErrorEsperado,ERROR_MESSAGE() Mensaje,SYSDATETIME() Fin;
 END CATCH;
-PRINT 'Sesión B - fin ' + CONVERT(VARCHAR(12), SYSDATETIME(), 114);   -- ~10 s después de su inicio: estuvo esperando
 GO

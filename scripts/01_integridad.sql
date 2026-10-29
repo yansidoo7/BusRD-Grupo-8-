@@ -12,7 +12,7 @@ GO
    1. DETECCIÓN DE DATOS SUCIOS
    --------------------------------------------------------- */
 
--- 1.1 Boletos ACTIVOS duplicados (mismo viaje y mismo asiento)  -> esperado: 60 filas
+-- 1.1 Boletos ACTIVOS duplicados (mismo viaje y mismo asiento)  -> cantidad medida; el generador inserta 60 boletos extra
 SELECT ViajeID, NumeroAsiento,
        COUNT(*)       AS Cantidad,
        MIN(BoletoID)  AS BoletoOriginal,
