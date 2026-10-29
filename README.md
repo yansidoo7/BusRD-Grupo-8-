@@ -24,7 +24,7 @@ Requisitos: Docker en funcionamiento, Python 3 con venv y acceso a Internet. No 
 
 ```bash
 # 16400 es un ejemplo para probar; sustituir por la asignación real.
-./validacion/docker-terminal.sh 16400
+bash validacion/docker-terminal.sh 16400
 ```
 
 El comando descarga SQL Server 2022 Developer, carga los scripts originales, captura la línea base, reproduce la doble venta en conexiones distintas, instala las correcciones, comprueba bloqueo/rechazo, atomicidad, anulación/reventa, equivalencia de consultas, permisos y restauración STOPAT. Cualquier error no esperado termina la validación con salida distinta de cero. El proceso puede tardar varios minutos.
