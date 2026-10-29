@@ -74,7 +74,7 @@ GO
 
 /* ---------- 5.1 rol_taquilla ---------- */
 -- (preparación como dbo: viaje y asiento libres para la prueba)
-DECLARE @ViajeGrupo INT = 16400;   -- <<< CAMBIAR: viaje asignado (se evita para no alterar E5)
+DECLARE @ViajeGrupo INT = (SELECT ViajeID FROM dbo.ConfiguracionGrupo WHERE GrupoID=8);   -- <<< CAMBIAR: viaje asignado (se evita para no alterar E5)
 DECLARE @ViajeTest INT =
     (SELECT TOP (1) ViajeID FROM dbo.Viajes
      WHERE Estado = 'Programado' AND ViajeID <> @ViajeGrupo ORDER BY ViajeID DESC);
