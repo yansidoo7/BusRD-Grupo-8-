@@ -145,8 +145,8 @@ GO
 /* ---------- Boletos (~230,000) ---------- */
 IF OBJECT_ID('tempdb..#Ocup') IS NOT NULL DROP TABLE #Ocup;
 SELECT v.ViajeID, r.PrecioBase, a.Capacidad,
-       FechaRef = CASE WHEN v.FechaSalida > '2026-10-14T12:00'
-                       THEN CAST('2026-10-14T12:00' AS DATETIME2(0))
+       FechaRef = CASE WHEN v.FechaSalida > '2026-10-14T12:00:00'
+                       THEN CAST('2026-10-14T12:00:00' AS DATETIME2(0))
                        ELSE v.FechaSalida END,
        Ocup = CASE WHEN v.Estado = 'Programado'
                    THEN ABS(CHECKSUM(NEWID())) % 8 + 1
