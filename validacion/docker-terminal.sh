@@ -19,10 +19,30 @@ docker run --detach --name "$name" -e ACCEPT_EULA=Y -e MSSQL_PID=Developer \
  -p "127.0.0.1:$port:1433" mcr.microsoft.com/mssql/server:2022-latest >/dev/null
 python3 -m venv /tmp/busrd-grupo8-venv
 /tmp/busrd-grupo8-venv/bin/pip -q install -r validacion/requirements.txt
-ready=0
-for attempt in $(seq 1 60); do
- if docker logs "$name" 2>&1 | grep -q 'SQL Server is now ready for client connections'; then ready=1; break; fi
- sleep 2
-done
-if [ "$ready" -ne 1 ]; then docker logs "$name"; exit 1; fi
+/tmp/busrd-grupo8-venv/bin/python - <<'PY'
+import os
+import time
+import pytds
+
+for intento in range(60):
+    try:
+        conexion = pytds.connect(
+            os.environ["BUSRD_HOST"],
+            port=int(os.environ["BUSRD_PORT"]),
+            user=os.environ["BUSRD_USER"],
+            password=os.environ["BUSRD_PASSWORD"],
+            database="master",
+            autocommit=True,
+            login_timeout=3,
+        )
+        conexion.close()
+        print("SQL Server acepta conexiones.")
+        break
+    except pytds.Error:
+        time.sleep(2)
+    except OSError:
+        time.sleep(2)
+else:
+    raise SystemExit("SQL Server no aceptó la conexión en el plazo esperado.")
+PY
 /tmp/busrd-grupo8-venv/bin/python validacion/validar.py --recrear-base-pruebas --viaje "$1"
